@@ -80,4 +80,12 @@ def update_chat_history(chat_history: List[Dict[str, str]],
                         content: str, 
                         max_history: int = 10) -> List[Dict[str, str]]:
     chat_history.append({"role": role, "content": content})
-    return chat_history[-max_history:]
+
+    chat_history[-max_history:]
+
+    # first message must be from user
+    if chat_history[0].get("role") != "user":
+        # lazily assuming 1 user 1 assistant back and forth
+        chat_history = chat_history[1:]
+
+    return chat_history
