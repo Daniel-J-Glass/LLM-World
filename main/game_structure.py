@@ -63,7 +63,7 @@ class Game:
         if not isinstance(game_output, dict):
             return  # Skip processing if game_output is not a dictionary
 
-        movement = game_output.get('movement', 'NONE')
+        movement = game_output.get('movement')
         visuals = game_output.get('visuals', {})
         narrative = game_output.get('narrative', '')
         print(game_output)
@@ -75,11 +75,12 @@ class Game:
             image_bytes = generate_image(visual)
             self.current_image = Image.open(io.BytesIO(image_bytes)) if image_bytes else None
 
-        if movement != 'NONE':
+        if movement:
             success, _ = self.world_map.move(movement)
             if success and 'map' in game_output:
                 new_location = self.world_map.current_position
-                self.world_map.update_location(*new_location, game_output['map'].get('scene_description', ''))
+                tile_color = game_output['map'].get('tile_color', '#FFFFFF')
+                self.world_map.update_location(*new_location, game_output['map'].get('scene_description', ''), tile_color)
 
         # Process any new rules
         for rule in game_output.get('rule_updates', []):

@@ -9,7 +9,7 @@ class WorldMap:
     def get_or_create_location(self, x, y):
         position = (x, y)
         if position not in self.map:
-            available_directions = random.sample(["N", "S", "E", "W"], k=random.randint(1, 4))
+            available_directions = ["N", "S", "E", "W"]
             self.map[position] = {
                 "description": "This area hasn't been described yet.",
                 "directions": available_directions,
@@ -24,9 +24,6 @@ class WorldMap:
             location["color"] = color
 
     def move(self, direction):
-        current_location = self.get_or_create_location(*self.current_position)
-        if direction not in current_location["directions"]:
-            return False, f"You cannot move {direction} from here."
         moves = {"N": (0, 1), "S": (0, -1), "E": (1, 0), "W": (-1, 0)}
         self.current_position = (
             self.current_position[0] + moves[direction][0],
@@ -37,8 +34,8 @@ class WorldMap:
     def get_current_description(self):
         return self.get_or_create_location(*self.current_position)["description"]
 
-    def get_current_color(self):
-        return self.get_or_create_location(*self.current_position)["color"]
+    def get_location_color(self, x, y):
+        return self.get_or_create_location(x, y)["color"]
 
     def get_available_directions(self):
         return self.get_or_create_location(*self.current_position)["directions"]

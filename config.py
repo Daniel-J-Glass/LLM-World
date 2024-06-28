@@ -27,7 +27,7 @@ NARRATIVE_PARAMETER_NAME = "narrative"
 TOOLS = [
     {
         "name": "game_output",
-        "description": "Interpret player action, generate narrative, and update rules",
+        "description": "Provide values necessary for a cohesive game experience based on the player action",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -40,25 +40,25 @@ TOOLS = [
                     "items": {
                         "type": "string",
                     },
-                    "description": "The objective events that should be tracked after the player's actions"
+                    "description": "The objective events that should be tracked after the player actions"
                 },
                 "visuals": {
                     "type": "object",
                     "properties": {
                         "first_person_scene": {"type": "string", "description":"What the player sees, first person POV"},
-                        "tile_color": {"type": "string", "description":"The color this location would be on a tiled map (like #FFFFFF)"}
                     }
                 },
                 "map": {
                     "type": "object",
                     "properties": {
                         "scene_description": {"type": "string","description": "The overall visual scene description after the user action and events have taken place"},
+                        "tile_color": {"type": "string", "description":"The color this location would be on a tiled map (like #FFFFFF)"}
                     }
                 },
                 "movement": {
                     "type": "string",
-                    "enum": ["N", "S", "E", "W", "NONE"],
-                    "description": "Where the player wants to go (N, S, E, W) or NONE if no movement",
+                    "enum": ["N", "S", "E", "W"],
+                    "description": "Where the player wants to move (N, S, E, W)",
                 },
                 "rule_updates": {
                     "type": "array",
@@ -72,7 +72,7 @@ TOOLS = [
                     "description": "Any new rules or updates to existing rules"
                 },
             },
-            "required": ["movement", "narrative"]
+            "required": ["narrative", "events"]
         }
     }
 ]

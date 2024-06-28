@@ -153,8 +153,7 @@ class GameGUI:
         for x in range(-visible_range, visible_range + 1):
             for y in range(-visible_range, visible_range + 1):
                 pos_x, pos_y = cx + x, cy + y
-                location = self.game.world_map.get_or_create_location(pos_x, pos_y)
-                color = location["color"]
+                color = self.game.world_map.get_location_color(pos_x, pos_y)
                 
                 # Calculate the position on the minimap
                 map_x = (x + visible_range) * tile_size
@@ -172,6 +171,7 @@ class GameGUI:
             center_x, center_y, center_x + tile_size, center_y + tile_size,
             outline="red", width=2
         )
+
 
     def run(self):
         self.master.mainloop()
