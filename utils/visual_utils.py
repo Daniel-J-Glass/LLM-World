@@ -4,7 +4,7 @@ import requests
 from config import (IMAGE_GENERATION_MODEL, SD_KEY, SD_API_HOST)
 
 
-def generate_image(prompt):
+def generate_image(positive_prompt, negative_prompt):
     """takes in prompt and filename and saves generated image to filename
 
     Args:
@@ -23,7 +23,8 @@ def generate_image(prompt):
             },
             files={"none": ''},
             data={
-                "prompt": prompt,
+                "prompt": positive_prompt,
+                "negative_prompt": negative_prompt,
                 "samples": 1,
                 "aspect_ratio": "3:2",
                 "output_format": "jpeg",

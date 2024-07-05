@@ -11,7 +11,7 @@ class WorldMap:
         if position not in self.map:
             available_directions = ["N", "S", "E", "W"]
             self.map[position] = {
-                "description": "This area hasn't been described yet.",
+                "description": None,
                 "directions": available_directions,
                 "color": "#FFFFFF"  # Default color
             }
@@ -32,7 +32,7 @@ class WorldMap:
         return True, self.get_current_description()
 
     def get_current_description(self):
-        return self.get_or_create_location(*self.current_position)["description"]
+        return self.get_or_create_location(*self.current_position).get("description")
 
     def get_location_color(self, x, y):
         return self.get_or_create_location(x, y)["color"]

@@ -21,7 +21,7 @@ def create_message_stream(client: anthropic.Anthropic,
                           chat_history: List[Dict[str, str]] = None,
                           system_prompt: str = "You are a helpful assistant.",
                           model: str = "claude-3-5-sonnet-20240620",
-                          max_tokens: int = 1000,
+                          max_tokens: int = 1500,
                           temperature: float = 0) -> Generator[str, None, Dict]:
     try:
         if chat_history is None:

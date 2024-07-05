@@ -43,6 +43,7 @@ class Game:
         self.chat_history = []
         self.current_image = None
         self.load_state()
+        # TODO: On new game, pass in user input "Look around"
 
     def process_input(self, user_input):
         current_description = self.world_map.get_current_description()
@@ -52,7 +53,7 @@ class Game:
         context += f"Current world rules: {json.dumps(self.world_state.rules)}\n"
         context += f"Recent events: {json.dumps(self.world_state.events[-5:])}\n"
         context += f"Player action: {user_input}\n"
-        context += "Interpret the player's action, including any movement. If the player is trying to move, determine the direction (N, S, E, W) and include it in your response. If the action doesn't involve movement, set the movement to NONE. Then, describe the result of the player's action and the new surroundings if movement occurred. If this is a new or undescribed location, provide a scene description. Descriptions should be brief, but can be longer if the user looks around more. If any new rules are discovered or significant events occur, include them in your response. Make sure to include a first_person_scene description in the visuals for image generation."
+        context += "You are the game master for providing a narrative based experience. Interpret the player's action. If any new rules are discovered or significant events occur, include them in your response. The player can try to move N, E, S, W in accordance with the narrative."
 
         # Update chat history with user input
         self.chat_history = update_chat_history(self.chat_history, "user", user_input)
@@ -72,15 +73,17 @@ class Game:
         first_person_scene = visuals.get('first_person_scene', '')
         if first_person_scene:
             visual = config.FIRST_PERSON_MODIFIER.format(visual=first_person_scene)
-            image_bytes = generate_image(visual)
+            image_bytes = generate_image(positive_prompt=visual, negative_prompt=config.NEGATIVE_STYLE_MODIFIER)
             self.current_image = Image.open(io.BytesIO(image_bytes)) if image_bytes else None
 
-        if movement:
+        if movement and movement!="NONE":
             success, _ = self.world_map.move(movement)
-            if success and 'map' in game_output:
-                new_location = self.world_map.current_position
-                tile_color = game_output['map'].get('tile_color', '#FFFFFF')
-                self.world_map.update_location(*new_location, game_output['map'].get('scene_description', ''), tile_color)
+
+        current_description = self.world_map.get_current_description()
+        if 'map' in game_output and not current_description:
+            new_location = self.world_map.current_position
+            tile_color = game_output['map'].get('tile_color', '#FFFFFF')
+            self.world_map.update_location(*new_location, game_output['map'].get('scene_description', ''), tile_color)
 
         # Process any new rules
         for rule in game_output.get('rule_updates', []):
