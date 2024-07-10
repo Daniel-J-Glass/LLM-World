@@ -33,7 +33,8 @@ def create_message_stream(client: anthropic.Anthropic,
             temperature=temperature,
             system=system_prompt,
             messages=chat_history,
-            tools=config.TOOLS
+            tools=config.TOOLS,
+            tool_choice = config.TOOL_CHOICE
         ) as stream:
             tool_text = ""
             narrative = ""

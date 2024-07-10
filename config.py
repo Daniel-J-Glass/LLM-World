@@ -29,13 +29,13 @@ NARRATIVE_PARAMETER_NAME = "narrative"
 TOOLS = [
     {
         "name": "game_output",
-        "description": "Provide only the values necessary for a cohesive game experience based on the player action. Output in JSON format.",
+        "description": "Provide only the values necessary for a cohesive game experience based on the player action using well-structured JSON.",
         "input_schema": {
             "type": "object",
             "properties": {
                 NARRATIVE_PARAMETER_NAME: {
                     "type": "string",
-                    "description": "This narrates what the player experiences as a result of their action"
+                    "description": " Make the output always in html format like ```html\n<content>\n```. This narrates what the player experiences as a result of their action. This is to be enjoyable and easily understood by a 1st grader unfamiliar with text based games (guide the story with listed decisions, spoonfeed the adventure)."
                 },
                 "events": {
                     "type": "array",
@@ -49,7 +49,7 @@ TOOLS = [
                     "properties": {
                         "first_person_scene": {"type": "string", "description":"Imagine exactly what the player sees in this situation. Use theory of mind to describe exactly and only what the player would be seeing precisely."},
                     },
-                    "description": "These properties are used to generate an image with stable diffusion"
+                    "description": "This generates images. DO NOT USE XML TAGS"
                 },
                 "map": {
                     "type": "object",
@@ -62,7 +62,7 @@ TOOLS = [
                 "movement": {
                     "type": "string",
                     "enum": ["N", "S", "E", "W"],
-                    "description": "Where the player wants to move to a new scene (N, S, E, W)",
+                    "description": "Where the player moves in accordance with the narrative. (if they move to a new scene use this) (N, S, E, W)",
                 },
                 "rule_updates": {
                     "type": "array",
@@ -73,10 +73,11 @@ TOOLS = [
                             "rule_description": {"type": "string"}
                         }
                     },
-                    "description": "Any fundamental mechanics about reality that the player discovers. This should be very rare. This contributes to the rules of reality."
+                    "description": "Any fundamental mechanics about the world that the player discovers. This should be very rare."
                 },
             },
             "required": ["narrative", "visuals", "events"]
-        }
+        },
     }
 ]
+TOOL_CHOICE = {"type": "tool", "name": "game_output"}

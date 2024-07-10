@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>LLM World Explorer</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            margin: 0;
+            padding: 20px;
+            background-color: #0a0a0a;
+            color: #00ff00;
+        }
+        #game-container {
+            display: flex;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        #game-content {
+            flex: 1;
+        }
+        #minimap-container {
+            width: 200px;
+            height: 200px;
+            border: 1px solid #00ff00;
+            margin-left: 20px;
+            position: relative;
+        }
+        #minimap {
+            position: absolute;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            left: 0;
+        }
+        #image-display {
+            max-width: 100%;
+            height: auto;
+            margin-bottom: 20px;
+            border: 2px solid #00ff00;
+        }
+        #message-display {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #00ff00;
+            padding: 10px;
+            margin-bottom: 20px;
+            background-color: #0f0f0f;
+        }
+        #chat-form {
+            margin-bottom: 20px;
+        }
+        #user-input {
+            width: 80%;
+            padding: 5px;
+            background-color: #0f0f0f;
+            color: #00ff00;
+            border: 1px solid #00ff00;
+        }
+        button {
+            padding: 5px 10px;
+            background-color: #00ff00;
+            color: #0a0a0a;
+            border: none;
+            cursor: pointer;
+        }
+        h1 {
+            text-align: center;
+            color: #00ffff;
+            text-shadow: 0 0 10px #00ffff;
+        }
+    </style>
+    <script>
+        $(document).ready(function() {
+            function loadChatHistory() {
+                $.get('/chat_history', function(data) {
+                    $('#message-display').empty();
+                    data.history.forEach(function(message) {
+                        var role = message.role === 'user' ? 'You' : 'Game';
+                        var content = message.content;
+                        if (role === 'Game') {
+                            content = content.replace(/```html\n([\s\S]*?)```/g, '$1');
+                        }
+                        $('#message-display').append('<p><strong>' + role + ':</strong> ' + content + '</p>');
+                    });
+                    $('#message-display').scrollTop($('#message-display')[0].scrollHeight);
+                });
+            }
+
+            $('#chat-form').submit(function(event) {
+                event.preventDefault();
+                var userInput = $('#user-input').val();
+                $('#user-input').val('');
+                
+                $.ajax({
+                    url: '/chat',
+                    method: 'POST',
+                    data: { user_input: userInput },
+                    success: function(response) {
+                        loadChatHistory();
+                        updateImage();
+                        updateMinimap();
+                    }
+                });
+            });
+
+            $('#reset-button').click(function() {
+                $.ajax({
+                    url: '/reset',
+                    method: 'POST',
+                    success: function(response) {
+                        if (response.status === 'success') {
+                            $('#message-display').empty();
+                            $('#image-display').attr('src', '');
+                            updateMinimap();
+                        }
+                    }
+                });
+            });
+
+            function updateImage() {
+                $.get('/image', function(data) {
+                    var imageData = data.image;
+                    if (imageData) {
+                        $('#image-display').attr('src', 'data:image/png;base64,' + imageData);
+                    } else {
+                        $('#image-display').attr('src', '');
+                    }
+                });
+            }
+
+            function updateMinimap() {
+                $.get('/minimap', function(data) {
+                    var minimapData = data.minimap;
+                    var currentPosition = data.current_position;
+                    var minimapCanvas = $('#minimap')[0];
+                    var ctx = minimapCanvas.getContext('2d');
+                    
+                    ctx.clearRect(0, 0, minimapCanvas.width, minimapCanvas.height);
+                    
+                    var tileSize = 10;
+                    minimapData.forEach(function(tile) {
+                        ctx.fillStyle = tile.color;
+                        ctx.fillRect((tile.x - currentPosition.x + 10) * tileSize, 
+                                     (10 - (tile.y - currentPosition.y)) * tileSize, 
+                                     tileSize, tileSize);
+                    });
+                    
+                    ctx.fillStyle = '#ff0000';
+                    ctx.fillRect(10 * tileSize, 10 * tileSize, tileSize, tileSize);
+                });
+            }
+
+            loadChatHistory();
+            updateImage();
+            updateMinimap();
+        });
+    </script>
+</head>
+<body>
+    <h1>LLM World Explorer</h1>
+    <div id="game-container">
+        <div id="game-content">
+            <img id="image-display" src="" alt="Game Image">
+            <div id="message-display"></div>
+            <form id="chat-form">
+                <input type="text" id="user-input" name="user_input" placeholder="Type your message...">
+                <button type="submit">Send</button>
+            </form>
+            <button id="reset-button">Reset Game</button>
+        </div>
+        <div id="minimap-container">
+            <canvas id="minimap" width="200" height="200"></canvas>
+        </div>
+    </div>
+</body>
+</html>

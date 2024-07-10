@@ -8,3 +8,6 @@
     - ```game_state.json```
     - ```world_map.json```
     - ```world_state.json```
+
+## Examples
+![Example screenshot](examples/GUI_Cave.png)

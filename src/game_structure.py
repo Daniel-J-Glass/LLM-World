@@ -1,7 +1,7 @@
 import json
 from utils.llm_utils import create_message_stream, update_chat_history
 from utils.visual_utils import generate_image
-from main.world_map import WorldMap
+from src.world_map import WorldMap
 import io
 from PIL import Image
 import base64
@@ -137,3 +137,32 @@ class Game:
 
     def get_current_image(self):
         return self.current_image
+
+    def get_minimap_data(self):
+        minimap_data = []
+        visited_positions = set()
+
+        def dfs(x, y, distance):
+            if distance <= 0:
+                return
+
+            visited_positions.add((x, y))
+            minimap_data.append({
+                'x': x,
+                'y': y,
+                'color': self.world_map.get_location_color(x, y)
+            })
+
+            for direction in self.world_map.get_available_directions():
+                dx, dy = {"N": (0, 1), "S": (0, -1), "E": (1, 0), "W": (-1, 0)}[direction]
+                new_x, new_y = x + dx, y + dy
+                if (new_x, new_y) not in visited_positions:
+                    dfs(new_x, new_y, distance - 1)
+
+        start_x, start_y = self.world_map.current_position
+        dfs(start_x, start_y, 5)  # Explore up to a distance of 5 from the current position
+
+        return {
+            'minimap': minimap_data,
+            'current_position': {'x': start_x, 'y': start_y}
+        }

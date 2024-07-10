@@ -1,10 +1,12 @@
 import tkinter as tk
 import codecs
 from tkinter import scrolledtext
-from main.game_structure import Game
+from src.game_structure import Game
 from utils.llm_utils import initialize_client, update_chat_history
 import threading
 from PIL import Image, ImageTk
+import markdown
+import html
 
 def unescape_string(s):
     s = s.replace("\\n", "\n")
@@ -39,6 +41,9 @@ class GameGUI:
         self.message_display = scrolledtext.ScrolledText(text_frame, width=70, height=10)
         self.message_display.pack(side=tk.LEFT, pady=10, padx=5, fill=tk.BOTH, expand=True)
         self.message_display.config(state=tk.DISABLED)
+        self.message_display.tag_config("user", foreground="blue")
+        self.message_display.tag_config("game", foreground="green")
+
 
         # Rules and events display
         self.rules_events_display = scrolledtext.ScrolledText(text_frame, width=40, height=10)
@@ -58,8 +63,20 @@ class GameGUI:
     def load_chat_history(self):
         self.message_display.config(state=tk.NORMAL)
         for message in self.game.chat_history:
-            role = "You" if message["role"] == "user" else "Game"
-            self.message_display.insert(tk.END, f"{role}: {message['content']}\n\n")
+            role = "User" if message["role"] == "user" else "Game"
+            content = message['content']
+            
+            if role == "Game" and content.startswith("```html"):
+                # Parse HTML content
+                content = content[7:-3]  # Remove ```html and ```
+                content = html.unescape(content)
+                self.message_display.insert(tk.END, f"{role}: ", role.lower())
+                self.message_display.insert(tk.END, content, (role.lower(), "html"))
+                self.message_display.insert(tk.END, "\n\n")
+            else:
+                self.message_display.insert(tk.END, f"{role}: ", role.lower())
+                self.message_display.insert(tk.END, f"{content}\n\n")
+        
         self.message_display.see(tk.END)
         self.message_display.config(state=tk.DISABLED)
 
@@ -71,7 +88,9 @@ class GameGUI:
         self.input_box.delete(0, tk.END)
         
         self.message_display.config(state=tk.NORMAL)
-        self.message_display.insert(tk.END, f"You: {user_input}\n")
+        self.message_display.insert(tk.END, "User: ", "user")
+        self.message_display.insert(tk.END, f"{user_input}\n", "user")
+
         self.message_display.see(tk.END)
         self.message_display.config(state=tk.DISABLED)
 
@@ -82,7 +101,7 @@ class GameGUI:
         response_stream = self.game.process_input(user_input)
         
         self.message_display.config(state=tk.NORMAL)
-        self.message_display.insert(tk.END, "Game: ")
+        self.message_display.insert(tk.END, "Game: ", "game")
         
         narrative = ""
         for chunk in response_stream:
@@ -94,8 +113,14 @@ class GameGUI:
                     chunk = unescape_string(chunk)
                 except:
                     pass
+                
+                if chunk.startswith("```html"):
+                    # Parse HTML content
+                    chunk = chunk[7:-3]  # Remove ```html and ```
+                    chunk = html.unescape(chunk)
+                
                 narrative += chunk
-                self.message_display.insert(tk.END, chunk)
+                self.message_display.insert(tk.END, chunk, ("game","html"))
                 self.message_display.see(tk.END)
                 self.master.update_idletasks()
             elif isinstance(chunk, dict):
@@ -104,8 +129,13 @@ class GameGUI:
                     # Update the narrative with the full results
                     self.message_display.delete("end-{}c".format(len(narrative)+1), tk.END)
                     full_narrative = chunk['narrative']
-
-                    self.message_display.insert(tk.END, full_narrative)
+                    
+                    if full_narrative.startswith("```html"):
+                        # Parse HTML content
+                        full_narrative = full_narrative[7:-3]  # Remove ```html and ```
+                        full_narrative = html.unescape(full_narrative)
+                    
+                    self.message_display.insert(tk.END, full_narrative, ("game","html"))
 
                 self.game.update_game_state(chunk)
                 break
