@@ -1,12 +1,12 @@
 import tkinter as tk
-import codecs
 from tkinter import scrolledtext
 from src.game_structure import Game
 from utils.llm_utils import initialize_client, update_chat_history
 import threading
 from PIL import Image, ImageTk
-import markdown
 import html
+import io
+import cairosvg
 
 def unescape_string(s):
     s = s.replace("\\n", "\n")
@@ -22,12 +22,20 @@ class GameGUI:
         self.game = Game(client)
 
         # Main frame
-        self.main_frame = tk.Frame(master, width=800, height=600)
+        self.main_frame = tk.Frame(master, width=1200, height=800)
         self.main_frame.pack(fill=tk.BOTH, expand=True)
 
-        # Image display
-        self.image_display = tk.Label(self.main_frame)
-        self.image_display.pack(side=tk.TOP, pady=10)
+        # Image display frame
+        self.image_frame = tk.Frame(self.main_frame)
+        self.image_frame.pack(side=tk.TOP, pady=10)
+
+        # SVG image display
+        self.svg_display = tk.Label(self.image_frame)
+        self.svg_display.pack(side=tk.LEFT, padx=5)
+
+        # Generated image display
+        self.image_display = tk.Label(self.image_frame)
+        self.image_display.pack(side=tk.LEFT, padx=5)
 
         # Minimap
         self.minimap = tk.Canvas(self.main_frame, width=150, height=150)
@@ -43,7 +51,6 @@ class GameGUI:
         self.message_display.config(state=tk.DISABLED)
         self.message_display.tag_config("user", foreground="blue")
         self.message_display.tag_config("game", foreground="green")
-
 
         # Rules and events display
         self.rules_events_display = scrolledtext.ScrolledText(text_frame, width=40, height=10)
@@ -147,10 +154,24 @@ class GameGUI:
         self.is_processing = False
 
     def update_display(self):
-        # Update image display
+        # Update SVG display
+        first_person_svg = self.game.current_svg
+        if first_person_svg:
+            svg_image = self.svg_to_image(first_person_svg)
+            if svg_image:
+                svg_image = svg_image.resize((400, 300), Image.LANCZOS)
+                photo = ImageTk.PhotoImage(svg_image)
+                self.svg_display.config(image=photo)
+                self.svg_display.image = photo
+            else:
+                self.svg_display.config(image='')
+        else:
+            self.svg_display.config(image='')
+
+        # Update generated image display
         image = self.game.get_current_image()
         if image:
-            image = image.resize((600, 300), Image.LANCZOS)
+            image = image.resize((400, 300), Image.LANCZOS)
             photo = ImageTk.PhotoImage(image)
             self.image_display.config(image=photo)
             self.image_display.image = photo
@@ -203,8 +224,17 @@ class GameGUI:
         )
 
 
+    def svg_to_image(self, svg_string):
+        try:
+            png_data = cairosvg.svg2png(bytestring=svg_string.encode('utf-8'))
+            return Image.open(io.BytesIO(png_data))
+        except Exception as e:
+            print(f"Error converting SVG to image: {e}")
+            return None
+
     def run(self):
         self.master.mainloop()
+
 
 def main():
     root = tk.Tk()

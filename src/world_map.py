@@ -11,14 +11,16 @@ class WorldMap:
         if position not in self.map:
             available_directions = ["N", "S", "E", "W"]
             self.map[position] = {
+                "svg": None,
                 "description": None,
                 "directions": available_directions,
                 "color": "#FFFFFF"  # Default color
             }
         return self.map[position]
 
-    def update_location(self, x, y, description, color=None):
+    def update_location(self, x, y, svg, description, color=None):
         location = self.get_or_create_location(x, y)
+        location["svg"] = svg
         location["description"] = description
         if color:
             location["color"] = color
@@ -29,7 +31,10 @@ class WorldMap:
             self.current_position[0] + moves[direction][0],
             self.current_position[1] + moves[direction][1]
         )
-        return True, self.get_current_description()
+        return True, self.get_current_svg(), self.get_current_description()
+
+    def get_current_svg(self):
+        return self.get_or_create_location(*self.current_position).get("svg")
 
     def get_current_description(self):
         return self.get_or_create_location(*self.current_position).get("description")

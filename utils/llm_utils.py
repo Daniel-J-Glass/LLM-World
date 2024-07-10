@@ -20,6 +20,8 @@ def initialize_client() -> anthropic.Anthropic:
 def create_message_stream(client: anthropic.Anthropic,
                           chat_history: List[Dict[str, str]] = None,
                           system_prompt: str = "You are a helpful assistant.",
+                          tools: List[Dict] = None,
+                          tools_choice: Dict = None,
                           model: str = "claude-3-5-sonnet-20240620",
                           max_tokens: int = 1500,
                           temperature: float = 0) -> Generator[str, None, Dict]:
@@ -33,13 +35,11 @@ def create_message_stream(client: anthropic.Anthropic,
             temperature=temperature,
             system=system_prompt,
             messages=chat_history,
-            tools=config.TOOLS,
-            tool_choice = config.TOOL_CHOICE
+            tools=tools,
+            tool_choice = tools_choice
         ) as stream:
             tool_text = ""
-            narrative = ""
             in_narrative = False
-            function_call = None
 
             for event in stream:
                 if event.type == "content_block_delta" and event.delta.type == "input_json_delta":
@@ -67,8 +67,7 @@ def create_message_stream(client: anthropic.Anthropic,
 
             for content in message.content:
                 if content.type == 'tool_use':
-                    if content.name == 'game_output':
-                        yield content.input
+                    yield content.input
 
         yield None
 

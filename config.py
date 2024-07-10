@@ -18,15 +18,21 @@ SD_API_HOST = os.getenv('SD_API_HOST', 'https://api.stability.ai')
 
 # Image generation modifiers
 POSITIVE_STYLE_MODIFIER = "realistic"
-FIRST_PERSON_MODIFIER = "First person, POV, "+POSITIVE_STYLE_MODIFIER+", {visual}, nothing extra"
+FIRST_PERSON_MODIFIER = "First person, POV, " + POSITIVE_STYLE_MODIFIER + ", {visual}, nothing extra"
 NEGATIVE_STYLE_MODIFIER = "symmetric, artistic"
+
+SVG_IMAGE_CONTROL_STRENGTH = .7
 
 # Application Settings
 DEBUG_MODE = True
 LOG_FILE = "llm_world.log"
 
-NARRATIVE_PARAMETER_NAME = "narrative"
-TOOLS = [
+NARRATIVE_PARAMETER_NAME = "narrative" #used for streaming
+SCENE_SVG_INPUT_NAME = "Scene Visual"
+
+GAME_ENGINE_SYSTEM_PROMPT = "You are the game master for providing a narrative based experience. Interpret the player's action."
+
+GAME_TOOLS = [
     {
         "name": "game_output",
         "description": "Provide only the values necessary for a cohesive game experience based on the player action using well-structured JSON.",
@@ -35,7 +41,7 @@ TOOLS = [
             "properties": {
                 NARRATIVE_PARAMETER_NAME: {
                     "type": "string",
-                    "description": " Make the output always in html format like ```html\n<content>\n```. This narrates what the player experiences as a result of their action. This is to be enjoyable and easily understood by a 1st grader unfamiliar with text based games (guide the story with listed decisions, spoonfeed the adventure)."
+                    "description": " Make the output always in html format like ```html\n<content>\n```. This narrates what the player experiences as a result of their action."
                 },
                 "events": {
                     "type": "array",
@@ -44,20 +50,14 @@ TOOLS = [
                     },
                     "description": "The objective events that should be tracked after the player actions"
                 },
-                "visuals": {
+                "scene": {
                     "type": "object",
                     "properties": {
-                        "first_person_scene": {"type": "string", "description":"Imagine exactly what the player sees in this situation. Use theory of mind to describe exactly and only what the player would be seeing precisely."},
+                        "scene_description": {"type": "string","description": "A lossless visual description of the scene. Incorporate all objects description and layout in the scene."},
+                        "scene_svg": {"type": "string","description": "A highly detailed panorama picture of the scene (in SVG code). It should be in 4 vertical sections for all cardinal directions and their visual details. From the players POV."},
+                        "tile_color": {"type": "string", "description": "The color this location would be on a tiled map (like #FFFFFF)"}
                     },
-                    "description": "This generates images. DO NOT USE XML TAGS"
-                },
-                "map": {
-                    "type": "object",
-                    "properties": {
-                        "scene_description": {"type": "string","description": "The overall visual scene description after the user action and events have taken place. This should be consistent and communicate the highly detailed layout of the scene to the user."},
-                        "tile_color": {"type": "string", "description":"The color this location would be on a tiled map (like #FFFFFF)"}
-                    },
-                    "description": "Use this also when the movement property is used."
+                    "description": "Use this when the movement property is used. Should be used to reflect any changes resulting from the player action."
                 },
                 "movement": {
                     "type": "string",
@@ -76,8 +76,30 @@ TOOLS = [
                     "description": "Any fundamental mechanics about the world that the player discovers. This should be very rare."
                 },
             },
-            "required": ["narrative", "visuals", "events"]
+            "required": ["narrative", "events"]
         },
     }
 ]
-TOOL_CHOICE = {"type": "tool", "name": "game_output"}
+GAME_TOOL_CHOICE = {"type": "tool", "name": "game_output"}
+
+VISUAL_TOOLS = [
+    {
+        "name": "visual_output",
+        "description": "Provide the relevant visuals based on the player action using well-structured JSON.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "visuals": {
+                    "type": "object",
+                    "properties": {
+                        "first_person_description": {"type": "string", "description": "Visual description of exactly what the player sees in this situation. Use theory of mind to describe exactly and only what the player would be seeing precisely."},
+                        "first_person_svg": {"type": "string", "description": f"A highly detailed SVG visualization of the player's POV (kind of like a first person video game). This should be based on the {SCENE_SVG_INPUT_NAME} field and the description."}
+                    },
+                    "description": "These properties are used to generate visuals."
+                },
+            },
+            "required": ["visuals"]
+        },
+    }
+]
+VISUAL_TOOL_CHOICE = {"type": "tool", "name": "visual_output"}
