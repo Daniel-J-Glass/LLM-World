@@ -10,7 +10,7 @@ NARRATIVE_START_PATTERN = f'"{config.NARRATIVE_PARAMETER_NAME}"\\s*:\\s*"'
 NARRATIVE_END_PATTERN = r'(?<!\\)("[(,\s*\")(\s*\})])'
 NARRATIVE_PATTERN = NARRATIVE_START_PATTERN+r"([.\n]*)"+NARRATIVE_END_PATTERN
 
-def initialize_client() -> anthropic.Anthropic:
+def initialize_client(provider) -> anthropic.Anthropic:
     api_key = os.getenv('ANTHROPIC_API_KEY')
     if not api_key:
         raise ValueError("ANTHROPIC_API_KEY environment variable not set")

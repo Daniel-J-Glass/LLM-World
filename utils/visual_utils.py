@@ -7,7 +7,7 @@ import io
 import cairosvg
 import base64
 
-from config import (IMAGE_GENERATION_MODEL, SD_KEY, SD_API_HOST)
+from config import (IMAGE_GENERATION_MODEL, SD_KEY, SD_API_HOST, IMAGE_GENERATION_SEED)
 
 
 def send_async_generation_request(host, params, image_bytes=None):
@@ -83,7 +83,7 @@ def generate_image(positive_prompt, negative_prompt):
                 "samples": 1,
                 "aspect_ratio": "3:2",
                 "output_format": "jpeg",
-                "seed": 1,
+                "seed": IMAGE_GENERATION_SEED,
                 "model": {IMAGE_GENERATION_MODEL},
             },
         )
@@ -163,6 +163,7 @@ def generate_svg_image(positive_prompt, svg, negative_prompt=None, control_stren
             raise Exception(f"API request failed with status code {response.status_code}: {response.text}")
     
     except requests.RequestException as e:
+        print("Failed SVG image generation")
         raise Exception(f"API request failed: {str(e)}")
 
 if __name__ == "__main__":

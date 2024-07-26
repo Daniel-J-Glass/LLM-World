@@ -1,5 +1,5 @@
 import json
-from utils.llm_utils import create_message_stream, update_chat_history
+from utils.llm_utils import create_message_stream, update_chat_history, initialize_client
 from utils.visual_utils import generate_svg_image
 from src.world_map import WorldMap
 import io
@@ -38,8 +38,9 @@ class WorldState:
         self.save_state()
 
 class Game:
-    def __init__(self, client):
-        self.client = client
+    def __init__(self):
+        self.engine_client = initialize_client(config.ENGINE_LLM_PROVIDER)
+        self.visual_client = initialize_client(config.VISUAL_LLM_PROVIDER)
         self.world_map = WorldMap()
         self.world_state = WorldState()
         self.chat_history = []
@@ -61,7 +62,9 @@ class Game:
 
         self.chat_history = update_chat_history(self.chat_history, "user", user_input)
         
-        return create_message_stream(self.client, system_prompt=context, chat_history=self.chat_history, tools=config.GAME_TOOLS, tools_choice=config.GAME_TOOL_CHOICE)
+        print(self.chat_history)
+
+        return create_message_stream(self.engine_client, system_prompt=context, chat_history=self.chat_history, tools=config.GAME_TOOLS, tools_choice=config.GAME_TOOL_CHOICE)
     
     def generate_first_person_visuals(self, user_input, scene_svg, scene_description):
         user_input = f"User input: {user_input}\n{config.SCENE_SVG_INPUT_NAME}: {scene_svg}\nScene description: {scene_description}\n"
@@ -73,11 +76,12 @@ class Game:
                 "content": user_input
             }
         ]
-
-        visual_stream = create_message_stream(self.client, chat_history=chat_history, system_prompt=system_prompt, tools=config.VISUAL_TOOLS, tools_choice=config.VISUAL_TOOL_CHOICE)
+        print(user_input)
+        visual_stream = create_message_stream(self.visual_client, chat_history=chat_history, system_prompt=system_prompt, tools=config.VISUAL_TOOLS, tools_choice=config.VISUAL_TOOL_CHOICE)
 
         try:
             for chunk in visual_stream:
+                print(chunk)
                 if isinstance(chunk, dict):
                     return chunk["visuals"]
         except Exception as e:
@@ -120,6 +124,7 @@ class Game:
                 image_bytes = generate_svg_image(positive_prompt=first_person_visual, svg=first_person_svg, negative_prompt=config.NEGATIVE_STYLE_MODIFIER, control_strength=config.SVG_IMAGE_CONTROL_STRENGTH)
                 self.current_image = Image.open(io.BytesIO(image_bytes)) if image_bytes else None
             except Exception as e:
+                print(f"Failed to generate image: {str(e)}")
                 logging.error(f"Failed to generate image: {str(e)}")
                 self.current_image = None
 
@@ -166,6 +171,7 @@ class Game:
                 else:
                     self.current_image = None
         except FileNotFoundError:
+            print("File not found")
             # If the file doesn't exist, start with empty chat history and no image
             self.chat_history = []
             self.current_image = None

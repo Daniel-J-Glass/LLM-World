@@ -56,4 +56,5 @@ class WorldMap:
             self.map = {eval(k): v for k, v in state["map"].items()}
             self.current_position = tuple(state["current_position"])
         except FileNotFoundError:
+            print("Map not found.")
             self.get_or_create_location(0, 0)

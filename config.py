@@ -3,6 +3,15 @@ from dotenv import load_dotenv
 
 load_dotenv("local.env")
 
+# LLM Provider Settings
+LLM_PROVIDER = "anthropic"  # or "openai"
+ENGINE_LLM_PROVIDER = "anthropic"
+VISUAL_LLM_PROVIDER = "anthropic"
+
+# OpenAI Settings
+OPENAI_API_KEY_ENV_VAR = "OPENAI_API_KEY"
+OPENAI_DEFAULT_MODEL = "gpt-3.5-turbo"  # or "gpt-4" if you have access
+
 # API Settings
 ANTROPIC_API_KEY_ENV_VAR = "ANTHROPIC_API_KEY"
 
@@ -13,6 +22,8 @@ TEMPERATURE = 0.7
 
 # Image Generator Settings
 IMAGE_GENERATION_MODEL = os.environ.get('IMAGE_GENERATION_MODEL')
+IMAGE_GENERATION_SEED = 1
+
 SD_KEY = os.environ.get("SD_KEY")
 SD_API_HOST = os.getenv('SD_API_HOST', 'https://api.stability.ai')
 
@@ -21,7 +32,8 @@ POSITIVE_STYLE_MODIFIER = "realistic"
 FIRST_PERSON_MODIFIER = "First person, POV, " + POSITIVE_STYLE_MODIFIER + ", {visual}, nothing extra"
 NEGATIVE_STYLE_MODIFIER = "symmetric, artistic"
 
-SVG_IMAGE_CONTROL_STRENGTH = .7
+# 1 is more 0 is less
+SVG_IMAGE_CONTROL_STRENGTH = .3
 
 # Application Settings
 DEBUG_MODE = True
@@ -85,7 +97,7 @@ GAME_TOOL_CHOICE = {"type": "tool", "name": "game_output"}
 VISUAL_TOOLS = [
     {
         "name": "visual_output",
-        "description": "Provide the relevant visuals based on the player action using well-structured JSON.",
+        "description": "Provide the relevant visuals during the player action using well-structured JSON.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -93,7 +105,7 @@ VISUAL_TOOLS = [
                     "type": "object",
                     "properties": {
                         "first_person_description": {"type": "string", "description": "Visual description of exactly what the player sees in this situation. Use theory of mind to describe exactly and only what the player would be seeing precisely."},
-                        "first_person_svg": {"type": "string", "description": f"A highly detailed SVG visualization of the player's POV (kind of like a first person video game). This should be based on the {SCENE_SVG_INPUT_NAME} field and the description."}
+                        "first_person_svg": {"type": "string", "description": f"An accurate SVG visualization of the player's POV (like the player can see their hands, tools, etc.). Accurately capture composition, forms, and colors rather than complex details. This should be based on the {SCENE_SVG_INPUT_NAME} field and the description."}
                     },
                     "description": "These properties are used to generate visuals."
                 },

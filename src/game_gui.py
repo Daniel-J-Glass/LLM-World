@@ -18,8 +18,7 @@ class GameGUI:
         master.title("LLM World Explorer")
 
         # Initialize game
-        client = initialize_client()
-        self.game = Game(client)
+        self.game = Game()
 
         # Main frame
         self.main_frame = tk.Frame(master, width=1200, height=800)

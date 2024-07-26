@@ -6,8 +6,7 @@ from io import BytesIO
 
 app = Flask(__name__)
 
-client = initialize_client()
-game = Game(client)
+game = Game()
 
 @app.route('/')
 def index():
