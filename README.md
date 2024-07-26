@@ -9,7 +9,7 @@
     - ```world_map.json```
     - ```world_state.json```
 
-## Innovations
+## Novel Ideas
 ### LLM Anchored Image Generation
 By using LLM to output SVG, we provide a logical "grounding" to the scene. This SVG is consistent for the scene, meaning any interactions with the scene will update the SVG, guiding the image generated.
 
