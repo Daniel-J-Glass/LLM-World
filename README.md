@@ -9,11 +9,14 @@
     - ```world_map.json```
     - ```world_state.json```
 
-## Examples
-### Web App GUI
-![Web App GUI](examples/GUI_Room.png)
-
+## Innovations
 ### LLM Anchored Image Generation
 By using LLM to output SVG, we provide a logical "grounding" to the scene. This SVG is consistent for the scene, meaning any interactions with the scene will update the SVG, guiding the image generated.
 
 ![LLM Image Generation](examples/Developer_GUI.png)
+
+## Examples
+### Web App GUI
+![Web App GUI](examples/GUI_Room.png)
+
+
