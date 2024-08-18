@@ -52,23 +52,26 @@ class Game:
         current_svg = self.world_map.get_current_svg()
         current_description = self.world_map.get_current_description()
 
-        context = f"Current location SVG: {current_svg}\n"
-        context += f"Current location description: {current_description}\n"
+        context = f"Current scene SVG: {current_svg}\n"
+        context += f"Current scene description: {current_description}\n"
         context += f"Available directions: {', '.join(self.world_map.get_available_directions())}\n"
         context += f"Current world rules: {json.dumps(self.world_state.rules)}\n"
         context += f"Recent events: {json.dumps(self.world_state.events[-5:])}\n"
         context += f"Player action: {user_input}\n"
-        context += config.GAME_ENGINE_SYSTEM_PROMPT
+        system_prompt = config.GAME_ENGINE_SYSTEM_PROMPT
 
         self.chat_history = update_chat_history(self.chat_history, "user", user_input)
-        
-        print(self.chat_history)
 
-        return create_message_stream(self.engine_client, system_prompt=context, chat_history=self.chat_history, tools=config.GAME_TOOLS, tools_choice=config.GAME_TOOL_CHOICE)
+        chat_history = update_chat_history(self.chat_history, "assistant", context)
+        chat_history = update_chat_history(chat_history, "user", user_input)
+
+        return create_message_stream(self.engine_client, system_prompt=system_prompt, chat_history=chat_history, tools=config.GAME_TOOLS, tools_choice=config.GAME_TOOL_CHOICE)
     
     def generate_first_person_visuals(self, user_input, scene_svg, scene_description):
-        user_input = f"User input: {user_input}\n{config.SCENE_SVG_INPUT_NAME}: {scene_svg}\nScene description: {scene_description}\n"
-        system_prompt = "Generate first-person visuals based on the user input, scene SVG, and scene description."
+        user_input = f"Previous Action: {user_input}\n{config.SCENE_SVG_INPUT_NAME}: {scene_svg}\nScene description: {scene_description}\n"
+        system_prompt = config.SVG_GENERATION_SYSTEM_PROMPT
+
+        print(user_input)
 
         chat_history = [
             {
@@ -76,12 +79,11 @@ class Game:
                 "content": user_input
             }
         ]
-        print(user_input)
+
         visual_stream = create_message_stream(self.visual_client, chat_history=chat_history, system_prompt=system_prompt, tools=config.VISUAL_TOOLS, tools_choice=config.VISUAL_TOOL_CHOICE)
 
         try:
             for chunk in visual_stream:
-                print(chunk)
                 if isinstance(chunk, dict):
                     return chunk["visuals"]
         except Exception as e:
@@ -94,45 +96,53 @@ class Game:
 
         movement = game_output.get('movement')
         narrative = game_output.get('narrative', '')
-        print(game_output)
+        scene = game_output.get('scene')
+        rule_updates = game_output.get('rule_updates')
+        events = game_output.get('events')
 
         svg = None
         description = None
         if movement and movement != "NONE":
             success, svg, description = self.world_map.move(movement)
 
-        if 'scene' in game_output and not (svg and description):
+        if scene and not (svg and description):
             new_location = self.world_map.current_position
-            tile_color = game_output['scene'].get('tile_color', '#FFFFFF')
-            new_svg = game_output['scene'].get('scene_svg')
-            new_description = game_output['scene'].get('scene_description')
+            tile_color = scene.get('tile_color', '#FFFFFF')
+            new_svg = scene.get('scene_svg')
+            new_description = scene.get('scene_description')
             self.world_map.update_location(*new_location, new_svg, new_description, tile_color)
 
         svg = self.world_map.get_current_svg()
         description = self.world_map.get_current_description()
         user_input = self.chat_history[-1]['content'] if self.chat_history else ""
 
-        visual_output = self.generate_first_person_visuals(user_input, svg, description)
-        first_person_description = visual_output.get("first_person_description")
-        first_person_svg = visual_output.get("first_person_svg")
+
+        print(json.dumps(game_output))
+        visual_output = game_output.get("visuals")
+        # visual_output = self.generate_first_person_visuals(user_input, svg, description)
+        first_person_description = visual_output.get("image_generation_prompt")
+        first_person_svg = visual_output.get("first_person_sees_svg")
+
+        print(f"First Person Description:\n{first_person_description}\n\nFirst Person SVG:\n{first_person_svg}")
 
         self.current_svg = first_person_svg # for dev ui display
 
         if first_person_description and first_person_svg:
             first_person_visual = config.FIRST_PERSON_MODIFIER.format(visual=first_person_description)
             try:
-                image_bytes = generate_svg_image(positive_prompt=first_person_visual, svg=first_person_svg, negative_prompt=config.NEGATIVE_STYLE_MODIFIER, control_strength=config.SVG_IMAGE_CONTROL_STRENGTH)
+                image_bytes = generate_svg_image(positive_prompt=first_person_visual, svg=first_person_svg, negative_prompt=config.NEGATIVE_STYLE_MODIFIER, kwargs=config.SVG_IMAGE_ARGS)
                 self.current_image = Image.open(io.BytesIO(image_bytes)) if image_bytes else None
             except Exception as e:
                 print(f"Failed to generate image: {str(e)}")
                 logging.error(f"Failed to generate image: {str(e)}")
                 self.current_image = None
 
-        for rule in game_output.get('rule_updates', []):
-            self.world_state.add_rule(rule['rule_name'], rule['rule_description'])
+        if rule_updates:
+            for rule in rule_updates:
+                self.world_state.add_rule(rule['rule_name'], rule['rule_description'])
 
-        if 'events' in game_output:
-            for event in game_output['events']:
+        if events:
+            for event in events:
                 self.world_state.add_event(event)
 
         self.chat_history = update_chat_history(self.chat_history, "assistant", narrative)

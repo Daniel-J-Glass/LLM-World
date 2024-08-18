@@ -7,6 +7,7 @@ from PIL import Image, ImageTk
 import html
 import io
 import cairosvg
+import codecs
 
 def unescape_string(s):
     s = s.replace("\\n", "\n")

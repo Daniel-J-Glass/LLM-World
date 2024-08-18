@@ -2,12 +2,12 @@ import requests
 import json
 import time
 import os
-from PIL import Image
+from PIL import Image, ImageFilter
 import io
 import cairosvg
 import base64
 
-from config import (IMAGE_GENERATION_MODEL, SD_KEY, SD_API_HOST, IMAGE_GENERATION_SEED)
+from config import (IMAGE_GENERATION_MODEL, SD_KEY, SD_API_HOST, IMAGE_GENERATION_SEED, SVG_IMAGE_ENDPOINT)
 
 
 def send_async_generation_request(host, params, image_bytes=None):
@@ -127,12 +127,12 @@ def generate_image(positive_prompt, negative_prompt):
 
     return None
 
-def generate_svg_image(positive_prompt, svg, negative_prompt=None, control_strength=0.7, seed=0, output_format="png"):
+def generate_svg_image(positive_prompt, svg, negative_prompt=None, seed=0, output_format="png", kwargs={}):
     # Render SVG to PNG
     png_data = cairosvg.svg2png(bytestring=svg.encode('utf-8'))
-    
+
     # Prepare the request
-    url = f"{SD_API_HOST}/v2beta/stable-image/control/sketch"
+    url = f"{SD_API_HOST}{SVG_IMAGE_ENDPOINT}"
     headers = {
         "Authorization": f"Bearer {SD_KEY}",
         "Accept": "image/*"
@@ -144,9 +144,9 @@ def generate_svg_image(positive_prompt, svg, negative_prompt=None, control_stren
     
     data = {
         "prompt": positive_prompt,
-        "control_strength": control_strength,
         "output_format": output_format
     }
+    data.update(kwargs)
     
     if negative_prompt:
         data["negative_prompt"] = negative_prompt
@@ -162,7 +162,7 @@ def generate_svg_image(positive_prompt, svg, negative_prompt=None, control_stren
         else:
             raise Exception(f"API request failed with status code {response.status_code}: {response.text}")
     
-    except requests.RequestException as e:
+    except Exception as e:
         print("Failed SVG image generation")
         raise Exception(f"API request failed: {str(e)}")
 
