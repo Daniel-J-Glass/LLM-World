@@ -37,9 +37,9 @@ CONTINUOUS_VIDEO = True
 GENERATE_VIDEO = True
 
 # Image generation modifiers
-POSITIVE_STYLE_MODIFIER = "realism, POV, first person perspective"
-FIRST_PERSON_MODIFIER = POSITIVE_STYLE_MODIFIER + ", {visual}"
-NEGATIVE_STYLE_MODIFIER = "symmetric, artistic, unrealistic, painting", 
+POSITIVE_STYLE_MODIFIER = ""
+FIRST_PERSON_MODIFIER = POSITIVE_STYLE_MODIFIER + "{visual}"
+NEGATIVE_STYLE_MODIFIER = "symmetric, cartoon, painting", 
 
 # 1 is more 0 is less
 SVG_IMAGE_ARGS = {
@@ -57,7 +57,7 @@ SCENE_SVG_INPUT_NAME = "Scene SVG"
 SVG_GENERATION_SYSTEM_PROMPT = "Generate first-person visuals based on the user's previous action, scene SVG, and scene description. Be highly descriptive and don't miss any details."
 
 GAME_ENGINE_SYSTEM_PROMPT = "You are the game master for providing a narrative based experience for a fantasy world. Act as a game engine by interpretting the player's action and update the game accordingly."
-VISUAL_ENGINE_SYSTEM_PROMPT = "Use the tools to AI generate an image. Use the Scene Description and Previous action to inform what image is generated."
+VISUAL_ENGINE_SYSTEM_PROMPT = "Use the tools to AI generate visuals. Use the Scene Description and Previous action to inform the visual generation prompt."
 
 GAME_TOOLS = [
     {
@@ -181,10 +181,14 @@ VISUAL_TOOLS = [
                 "properties": {
                     "visuals": {
                         "type": "object",
-                        "description": "These properties are used to generate visuals with Stable Diffusion ControlNet and RunwayML. Consistency between them is key. Describe the visuals in a way that is easy to understand and generate. No other senses described outside of visuals.",
+                        "description": "These properties are used to generate visuals. Consistency between them is key. Describe the visuals in a way that is easy to understand and generate. No other senses described outside of visuals.",
                         "properties": {
-                            "first_person_description": {"type": "string", "description": "This is a detailed Stable Diffusion prompt. Highly detailed description of what the player sees in this situation (first person visuals). Use theory of mind to describe exactly and only what the player would be seeing."},
-                            # "first_person_svg": {"type": "string", "description": f"This is used for ControlNet. First person POV. An accurate SVG picture of what the player sees (to match the above description). Accurately capture composition. If the player doesn't change scenes, base this on the {SCENE_SVG_INPUT_NAME} field and the description. If the user does change scenes, this should be completely different. This should not be a diagram."},
+                            "first_person_description": {
+                                "type": "string", 
+                                "description": """Use exactly this format for Stable Diffusion:
+    'A first person POV view of [main subject/focal point], [key environmental details], [lighting conditions]. [Important specific details about materials/textures/colors]. [Atmosphere/mood through visual elements only].'
+    Keep under 300 characters. Focus only on what is directly visible. Be photorealistic and precise."""
+                            },
                             "first_person_video": {"type": "string", "description": "Use less than 300 characters. This is used for RunwayML video generation prompt. First person POV. A description of what the player experiences based on their previous action and result in the next 5 seconds. Describe camera movement, then the result."}
                         },
                         "required": ["first_person_description", "first_person_video"],

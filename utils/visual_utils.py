@@ -170,11 +170,12 @@ def generate_image(positive_prompt, negative_prompt):
     Returns:
         str: base64 image encoding or none
     """
+    randomly_generated_seed = int(time.time())
 
     if "sd3.5" in IMAGE_GENERATION_MODEL:
         print(positive_prompt)
         response = requests.post(
-            f"{SD_API_HOST}/v2beta/stable-image/generate/core",
+            f"{SD_API_HOST}/v2beta/stable-image/generate/sd3",
             headers={
                 "authorization": f"Bearer {SD_KEY}",
                 "accept": "image/*"
@@ -186,8 +187,9 @@ def generate_image(positive_prompt, negative_prompt):
                 "samples": 1,
                 "aspect_ratio": "16:9",
                 "output_format": "jpeg",
-                "seed": IMAGE_GENERATION_SEED,
+                "seed": randomly_generated_seed,
                 "model": {IMAGE_GENERATION_MODEL},
+                "mode" : "text-to-image"
             },
         )
 
