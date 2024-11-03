@@ -84,6 +84,8 @@
     </style>
     <script>
         $(document).ready(function() {
+            let imagePollingInterval = null;
+            let currentImageData = null;
             let videoCheckInterval = null;
 
             function checkVideoStatus() {
@@ -104,6 +106,20 @@
                         );
 
                         // Clear interval once video is loaded
+                        if (videoCheckInterval) {
+                            clearInterval(videoCheckInterval);
+                            videoCheckInterval = null;
+                        }
+                    } else if (data.status === 'rate_limited') {
+                        // Handle rate limiting by displaying the image
+                        if (data.image) {
+                            if ($('#image-display').is('video')) {
+                                $('#image-display').replaceWith(
+                                    '<img id="image-display" src="" alt="Game Image">'
+                                );
+                            }
+                            $('#image-display').attr('src', 'data:image/png;base64,' + data.image);
+                        }
                         if (videoCheckInterval) {
                             clearInterval(videoCheckInterval);
                             videoCheckInterval = null;
@@ -138,7 +154,7 @@
                     data: { user_input: userInput },
                     success: function(response) {
                         loadChatHistory();
-                        updateImage();
+                        startImagePolling();  // Start polling for image updates
                         updateMinimap();
                     }
                 });
@@ -189,10 +205,18 @@
                 });
             });
 
+            function startImagePolling() {
+                if (imagePollingInterval) {
+                    clearInterval(imagePollingInterval);
+                }
+                imagePollingInterval = setInterval(updateImage, 1000);
+            }
+
             function updateImage() {
                 $.get('/image', function(data) {
                     var imageData = data.image;
-                    if (imageData) {
+                    if (imageData && imageData !== currentImageData) {
+                        currentImageData = imageData;
                         // Replace video with image if exists
                         if ($('#image-display').is('video')) {
                             $('#image-display').replaceWith(
@@ -201,6 +225,12 @@
                         }
                         $('#image-display').attr('src', 'data:image/png;base64,' + imageData);
                         
+                        // Stop polling once image is updated
+                        if (imagePollingInterval) {
+                            clearInterval(imagePollingInterval);
+                            imagePollingInterval = null;
+                        }
+
                         // Start checking for video if processing
                         if (data.video_processing && !videoCheckInterval) {
                             videoCheckInterval = setInterval(checkVideoStatus, 1000);
@@ -232,7 +262,7 @@
             }
 
             loadChatHistory();
-            updateImage();
+            updateImage();  // Initial image load
             updateMinimap();
         });
     </script>
