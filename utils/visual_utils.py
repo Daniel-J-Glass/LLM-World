@@ -7,7 +7,11 @@ import io
 import cairosvg
 import base64
 
-from config import (IMAGE_GENERATION_MODEL, SD_KEY, SD_API_HOST, IMAGE_GENERATION_SEED, SVG_IMAGE_ENDPOINT)
+from runwayml import RunwayML
+
+from imgur_python import Imgur
+
+from config import (IMAGE_GENERATION_MODEL, SD_KEY, SD_API_HOST, IMAGE_GENERATION_SEED, SVG_IMAGE_ENDPOINT, IMGUR_CLIENT_ID, IMGUR_CLIENT_SECRET,VIDEO_GENERATION_MODEL, VIDEO_GENERATION_KEY)
 
 
 def send_async_generation_request(host, params, image_bytes=None):
@@ -59,6 +63,95 @@ def send_async_generation_request(host, params, image_bytes=None):
 
     return response
 
+def upload_image_to_imgur(image_path):
+    """Uploads an image to Imgur and returns the URL.
+
+    Args:
+        image_path (str): The path to the image file.
+
+    Returns:
+        str: The URL of the uploaded image.
+    """
+    client_id = IMGUR_CLIENT_ID
+    headers = {"Authorization": f"Client-ID {client_id}"}
+    url = "https://api.imgur.com/3/image"
+
+    with open(image_path, "rb") as file:
+        files = {"image": file}
+        data = {
+            "type": "file",
+            "title": "Simple upload",
+            "description": "This is a simple image upload in Imgur"
+        }
+
+        response = requests.post(url, headers=headers, files=files, data=data)
+        
+    if response.status_code == 200:
+        data = response.json()
+        image_url = data["data"]["link"]
+        return image_url
+    else:
+        raise Exception(f"Failed to upload image: {response.text}")
+
+def image_to_video(prompt_text, image_url, video_path):
+    """Converts an image to a video.
+
+    Args:
+        image_path (str): The path to the image file.
+        video_path (str): The path to save the video file.
+    """
+    prompt_text = prompt_text[0:510]
+
+    print(f"Video Prompt: {prompt_text}")
+
+    # The env var RUNWAYML_API_SECRET is expected to contain your API key.
+    client = RunwayML(api_key=VIDEO_GENERATION_KEY)
+
+    task = client.image_to_video.create(
+        model=VIDEO_GENERATION_MODEL,
+        prompt_image=image_url,
+        prompt_text=prompt_text,
+        duration=5,
+        ratio='16:9'
+    )
+
+    task_id = task.id
+    # print(f"Task ID: {task_id}")
+
+    # Wait for the task to complete
+    while True:
+        time.sleep(1)
+        task = client.tasks.retrieve(id=task_id)
+        status = task.status
+        if status == 'PENDING':
+            continue
+        elif status == 'RUNNING':
+            # print(f"Task {task_id} is running with progress {task.progress}")
+            continue
+        elif status == 'SUCCEEDED':
+            output_urls = task.output
+            # print(f"Task {task_id} succeeded with output URLs:")
+            break
+        elif status == 'FAILED':
+            failure_reason = task.failure
+            failure_code = task.failureCode
+            raise Exception(f"Task {task_id} failed with reason: {failure_reason} (Code: {failure_code})")
+        elif status == 'CANCELED':
+            raise Exception(f"Task {task_id} was canceled")
+        else:
+            raise Exception(f"Unknown task status: {status}")
+
+    # Download the generated video
+    output_url = output_urls[0]
+    response = requests.get(output_url)
+    if response.status_code == 200:
+        with open(video_path, 'wb') as f:
+            f.write(response.content)
+        print(f"Saved generated video as {video_path}")
+    else:
+        raise Exception(f"Failed to download video: {response.text}")
+
+
 def generate_image(positive_prompt, negative_prompt):
     """takes in prompt and filename and saves generated image to filename
 
@@ -69,7 +162,8 @@ def generate_image(positive_prompt, negative_prompt):
         str: base64 image encoding or none
     """
 
-    if "sd3" in IMAGE_GENERATION_MODEL:
+    if "sd3.5" in IMAGE_GENERATION_MODEL:
+        print(positive_prompt)
         response = requests.post(
             f"{SD_API_HOST}/v2beta/stable-image/generate/core",
             headers={
@@ -81,7 +175,7 @@ def generate_image(positive_prompt, negative_prompt):
                 "prompt": positive_prompt,
                 "negative_prompt": negative_prompt,
                 "samples": 1,
-                "aspect_ratio": "3:2",
+                "aspect_ratio": "16:9",
                 "output_format": "jpeg",
                 "seed": IMAGE_GENERATION_SEED,
                 "model": {IMAGE_GENERATION_MODEL},
@@ -127,9 +221,15 @@ def generate_image(positive_prompt, negative_prompt):
 
     return None
 
-def generate_svg_image(positive_prompt, svg, negative_prompt=None, seed=0, output_format="png", kwargs={}):
+def generate_svg_image(positive_prompt, svg, negative_prompt=None, seed=0, output_format="png", svg_output_path="./temp_svg.png", kwargs={}):
     # Render SVG to PNG
-    png_data = cairosvg.svg2png(bytestring=svg.encode('utf-8'))
+    png_data = cairosvg.svg2png(bytestring=svg.encode('utf-8'), output_width=512, output_height=512)
+    
+    # Save the PNG data if svg_output_path is provided
+    if svg_output_path:
+        with open(svg_output_path, "wb") as f:
+            f.write(png_data)
+        print(f"Saved SVG-to-PNG image as {svg_output_path}")
 
     # Prepare the request
     url = f"{SD_API_HOST}{SVG_IMAGE_ENDPOINT}"
@@ -175,16 +275,31 @@ if __name__ == "__main__":
     '''
     test_prompt = "A red circle transformed into a beautiful rose"
     
-    try:
-        image_bytes = generate_svg_image(test_prompt, test_svg)
-        image = Image.open(io.BytesIO(image_bytes))
-        image.show()
-        
-        # Save the generated image
-        output_file = "generated_image.png"
-        with open(output_file, "wb") as f:
-            f.write(image_bytes)
-        print(f"Saved generated image as {output_file}")
-    except Exception as e:
-        print(f"Error generating image: {str(e)}")
+    # try:
+    image_bytes = generate_svg_image(test_prompt, test_svg, svg_output_path="debug_svg_to_png.png")
+    image = Image.open(io.BytesIO(image_bytes))
 
+    # Save the generated image
+    output_file = "./generated_image.png"
+    with open(output_file, "wb") as f:
+        f.write(image_bytes)
+    print(f"Saved generated image as {output_file}")
+
+    from os import path
+    import requests
+    import os
+    from runwayml import RunwayML
+    file = path.realpath(output_file)
+
+    # upload image
+    image_url = upload_image_to_imgur(file)
+    print(f"Uploaded image to Imgur: {image_url}")
+
+    # test video gen
+    prompt_text = "A rose burning in a fire, resulting in a pile of ash"
+    video_path = "./generated_video.mp4"
+    image_to_video(prompt_text, image_url, video_path)
+    print(f"Generated video from image: {video_path}")
+
+    # except Exception as e:
+    #     print(f"Error generating image: {str(e)}")

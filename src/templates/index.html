@@ -69,9 +69,49 @@
             color: #00ffff;
             text-shadow: 0 0 10px #00ffff;
         }
+        #compilation-container {
+            margin-top: 20px;
+            border-top: 1px solid #00ff00;
+            padding-top: 20px;
+        }
+        #compilation-video {
+            max-width: 100%;
+            height: auto;
+            border: 2px solid #00ff00;
+            margin-top: 10px;
+            display: none;
+        }
     </style>
     <script>
         $(document).ready(function() {
+            let videoCheckInterval = null;
+
+            function checkVideoStatus() {
+                $.get('/video_status', function(data) {
+                    if (data.status === 'ready') {
+                        // Create blob URL from video data
+                        const videoBlob = new Blob(
+                            [Uint8Array.from(atob(data.video), c => c.charCodeAt(0))], 
+                            { type: 'video/mp4' }
+                        );
+                        const videoUrl = URL.createObjectURL(videoBlob);
+
+                        // Replace image with video element
+                        $('#image-display').replaceWith(
+                            `<video id="image-display" autoplay>
+                                <source src="${videoUrl}" type="video/mp4">
+                            </video>`
+                        );
+
+                        // Clear interval once video is loaded
+                        if (videoCheckInterval) {
+                            clearInterval(videoCheckInterval);
+                            videoCheckInterval = null;
+                        }
+                    }
+                });
+            }
+
             function loadChatHistory() {
                 $.get('/chat_history', function(data) {
                     $('#message-display').empty();
@@ -118,13 +158,53 @@
                 });
             });
 
+            $('#compile-button').click(function() {
+                $(this).prop('disabled', true);
+                $(this).text('Compiling...');
+                
+                $.ajax({
+                    url: '/compile_videos',
+                    method: 'POST',
+                    success: function(response) {
+                        if (response.status === 'success') {
+                            const videoBlob = new Blob(
+                                [Uint8Array.from(atob(response.video), c => c.charCodeAt(0))], 
+                                { type: 'video/mp4' }
+                            );
+                            const videoUrl = URL.createObjectURL(videoBlob);
+                            
+                            $('#compilation-video').attr('src', videoUrl);
+                            $('#compilation-video').show();
+                        } else {
+                            alert('Compilation failed: ' + response.message);
+                        }
+                    },
+                    error: function() {
+                        alert('Failed to compile videos');
+                    },
+                    complete: function() {
+                        $('#compile-button').prop('disabled', false);
+                        $('#compile-button').text('Compile Adventure');
+                    }
+                });
+            });
+
             function updateImage() {
                 $.get('/image', function(data) {
                     var imageData = data.image;
                     if (imageData) {
+                        // Replace video with image if exists
+                        if ($('#image-display').is('video')) {
+                            $('#image-display').replaceWith(
+                                '<img id="image-display" src="" alt="Game Image">'
+                            );
+                        }
                         $('#image-display').attr('src', 'data:image/png;base64,' + imageData);
-                    } else {
-                        $('#image-display').attr('src', '');
+                        
+                        // Start checking for video if processing
+                        if (data.video_processing && !videoCheckInterval) {
+                            videoCheckInterval = setInterval(checkVideoStatus, 1000);
+                        }
                     }
                 });
             }
@@ -168,6 +248,12 @@
                 <button type="submit">Send</button>
             </form>
             <button id="reset-button">Reset Game</button>
+            <div id="compilation-container">
+                <button id="compile-button">Compile Adventure</button>
+                <video id="compilation-video" controls>
+                    Your browser does not support the video tag.
+                </video>
+            </div>
         </div>
         <div id="minimap-container">
             <canvas id="minimap" width="200" height="200"></canvas>
