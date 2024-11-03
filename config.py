@@ -34,6 +34,7 @@ VIDEO_GENERATION_MODEL = os.getenv("VIDEO_GENERATION_MODEL")
 VIDEO_FIRST_PERSON_MODIFIER = "{prompt}"
 VIDEO_GENERATION_KEY = os.getenv("RUNWAY_API_KEY")
 CONTINUOUS_VIDEO = True
+GENERATE_VIDEO = True
 
 # Image generation modifiers
 POSITIVE_STYLE_MODIFIER = "realism, POV, first person perspective"
@@ -180,11 +181,11 @@ VISUAL_TOOLS = [
                 "properties": {
                     "visuals": {
                         "type": "object",
-                        "description": "These properties are used to generate visuals with Stable Diffusion ControlNet and RunwayML. Consistency between them is key. Describe the visuals in a way that is easy to understand and generate.",
+                        "description": "These properties are used to generate visuals with Stable Diffusion ControlNet and RunwayML. Consistency between them is key. Describe the visuals in a way that is easy to understand and generate. No other senses described outside of visuals.",
                         "properties": {
-                            "first_person_description": {"type": "string", "description": "This is a detailed Stable Diffusion prompt. Do not miss any details. Highly detailed description of what the player sees in this situation (first person visuals). Use theory of mind to describe exactly and only what the player would be seeing."},
+                            "first_person_description": {"type": "string", "description": "This is a detailed Stable Diffusion prompt. Highly detailed description of what the player sees in this situation (first person visuals). Use theory of mind to describe exactly and only what the player would be seeing."},
                             # "first_person_svg": {"type": "string", "description": f"This is used for ControlNet. First person POV. An accurate SVG picture of what the player sees (to match the above description). Accurately capture composition. If the player doesn't change scenes, base this on the {SCENE_SVG_INPUT_NAME} field and the description. If the user does change scenes, this should be completely different. This should not be a diagram."},
-                            "first_person_video": {"type": "string", "description": "Use less than 400 characters. This is used for RunwayML video generation prompt. First person POV. An visual description of what the plaer sees based on their previous action and result in the next 5 seconds. Make the video start with the Previous Action and end on the Result. Describe camera movement that mirrors the player movement. If the player doesn't move, the camera shouldn't move."}
+                            "first_person_video": {"type": "string", "description": "Use less than 300 characters. This is used for RunwayML video generation prompt. First person POV. A description of what the player experiences based on their previous action and result in the next 5 seconds. Describe camera movement, then the result."}
                         },
                         "required": ["first_person_description", "first_person_video"],
                         "additionalProperties": False,

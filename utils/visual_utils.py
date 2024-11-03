@@ -7,7 +7,7 @@ import io
 import cairosvg
 import base64
 
-from runwayml import RunwayML
+import runwayml
 
 from imgur_python import Imgur
 
@@ -104,20 +104,24 @@ def image_to_video(prompt_text, image_url, video_path):
 
     print(f"Video Prompt: {prompt_text}")
 
-    # The env var RUNWAYML_API_SECRET is expected to contain your API key.
-    client = RunwayML(api_key=VIDEO_GENERATION_KEY)
 
-    task = client.image_to_video.create(
-        model=VIDEO_GENERATION_MODEL,
-        prompt_image=image_url,
-        prompt_text=prompt_text,
-        duration=5,
-        ratio='16:9'
-    )
+    # The env var RUNWAYML_API_SECRET is expected to contain your API key.
+    client = runwayml.RunwayML(api_key=VIDEO_GENERATION_KEY)
+
+    try:
+        task = client.image_to_video.create(
+            model=VIDEO_GENERATION_MODEL,
+            prompt_image=image_url,
+            prompt_text=prompt_text,
+            duration=5,
+            ratio='16:9',
+        )
+    except runwayml.RateLimitError as e:
+        raise requests.exceptions.RetryError("Rate limit exceeded")
 
     task_id = task.id
     # print(f"Task ID: {task_id}")
-
+    failure_code = None
     # Wait for the task to complete
     while True:
         time.sleep(1)
@@ -135,7 +139,12 @@ def image_to_video(prompt_text, image_url, video_path):
         elif status == 'FAILED':
             failure_reason = task.failure
             failure_code = task.failureCode
-            raise Exception(f"Task {task_id} failed with reason: {failure_reason} (Code: {failure_code})")
+            print(failure_code)
+            if failure_code == 429:
+                raise requests.exceptions.RetryError("Rate limit exceeded")
+            else:
+                raise Exception(f"Task {task_id} failed with code {failure_code}: {failure_reason}")
+    
         elif status == 'CANCELED':
             raise Exception(f"Task {task_id} was canceled")
         else:

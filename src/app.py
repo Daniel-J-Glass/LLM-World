@@ -39,6 +39,23 @@ def reset():
 
 @app.route('/video_status')
 def get_video_status():
+    print(game.rate_limited)
+    if game.rate_limited:
+        # If rate limited, return current image instead
+        image = game.get_current_image()
+        if image:
+            buffered = BytesIO()
+            image.save(buffered, format="PNG")
+            img_str = base64.b64encode(buffered.getvalue()).decode()
+            return jsonify({
+                'status': 'rate_limited',
+                'image': img_str
+            })
+        return jsonify({
+            'status': 'error',
+            'message': 'Rate limited and no fallback image available'
+        })
+        
     if game.video_processing:
         return jsonify({
             'status': 'processing'
@@ -57,21 +74,17 @@ def get_video_status():
 
 @app.route('/image')
 def get_image():
-    if game.video_processing:
-        # Return current frame if video is being processed
-        image = game.get_current_image()
-        if image:
-            buffered = BytesIO()
-            image.save(buffered, format="PNG")
-            img_str = base64.b64encode(buffered.getvalue()).decode()
-            return jsonify({
-                'image': img_str,
-                'video_processing': True
-            })
-    return jsonify({
-        'image': None,
-        'video_processing': game.video_processing
-    })
+    # Return current frame if video is being processed
+    image = game.get_current_image()
+    print(image)
+    if image:
+        buffered = BytesIO()
+        image.save(buffered, format="PNG")
+        img_str = base64.b64encode(buffered.getvalue()).decode()
+        return jsonify({
+            'image': img_str,
+            'video_processing': game.video_processing and not game.rate_limited
+        })
 
 @app.route('/minimap')
 def get_minimap():

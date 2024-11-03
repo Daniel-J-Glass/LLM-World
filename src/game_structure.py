@@ -1,24 +1,17 @@
 import json
-from utils.llm_utils import create_message_stream, update_chat_history, initialize_client
-from utils.visual_utils import generate_svg_image, generate_image, upload_image_to_imgur, image_to_video
-
-from src.world_map import WorldMap
+import os
 import io
-from PIL import Image
+import time
 import base64
 import shutil
-import time
-import os
-
+from PIL import Image
+from utils.llm_utils import create_message_stream, update_chat_history, initialize_client
+from utils.image_utils import ImageManager
+from utils.video_utils import VideoManager
+from utils.state_manager import StateManager
+from src.world_map import WorldMap
 import config
-
 import logging
-
-import asyncio
-import threading
-import tempfile  # Added for temporary file handling
-
-from moviepy.editor import VideoFileClip, concatenate_videoclips
 
 class WorldState:
     def __init__(self):
@@ -52,168 +45,92 @@ class Game:
         self.engine_client = initialize_client(config.ENGINE_LLM_PROVIDER)
         self.visual_client = initialize_client(config.VISUAL_LLM_PROVIDER)
 
+        self.state_manager = StateManager()
+        self.image_manager = ImageManager()
+        self.video_manager = VideoManager()
+
         os.makedirs("./saves", exist_ok=True)
         os.makedirs("./video_tmp", exist_ok=True)
 
-        self.final_path = os.path.abspath("./current_video.mp4")
-    
         self.world_map = WorldMap()
         self.world_state = WorldState()
         self.chat_history = []
         self.current_image = None
+        self.new_image = None
         self.current_svg = None
         self.current_video = None
-        self.video_path = None  # Store path to video file
         self.video_processing = False
-        self.videos_generated = 0  # Track number of videos generated
+
+        self.generate_video = config.GENERATE_VIDEO
         self.load_state()
-        self.cleanup_old_videos()
-
-    def start_video_generation(self, image_path, prompt):
-        def video_gen_thread():
-            try:
-                # Upload image to imgur
-                image_url = upload_image_to_imgur(image_path)
-                
-                # Generate unique video name
-                video_name = f"video_{self.videos_generated}.mp4"
-                temp_video_path = os.path.join("./video_tmp", video_name)
-                
-                # Generate video
-                image_to_video(prompt, image_url, temp_video_path)
-                
-                # Extract last frame from generated video
-                try:
-                    with VideoFileClip(temp_video_path) as clip:
-                        # Get last frame using iter_frames
-                        frames = [frame for i, frame in enumerate(clip.iter_frames()) 
-                                if i >= clip.reader.nframes - 1]
-                        if frames:
-                            last_frame = frames[-1]
-                            self.current_image = Image.fromarray(last_frame)
-                            # Save immediately to ensure persistence
-                            self.current_image.save("./current_frame.png")
-                            print(f"Extracted last frame successfully")
-                except Exception as e:
-                    print(f"Error extracting last frame: {e}")
-                
-                # Update state
-                self.current_video = temp_video_path
-                self.videos_generated += 1
-
-            except Exception as e:
-                print(f"Video generation failed: {str(e)}")
-            finally:
-                self.video_processing = False
-
-        self.video_processing = True
-        thread = threading.Thread(target=video_gen_thread, daemon=True)
-        thread.start()
-
-    def save_state(self):
-        """Save game state with improved video/image handling."""
-        try:
-            self.world_map.save_state()
-            self.world_state.save_state()
-            
-            self.current_video = self.final_path if self.current_video else None
-
-            state = {
-                'chat_history': self.chat_history,
-                'video_path': None,
-                'current_image': None
-            }
-            
-            # Save current video with unique name
-            if self.current_video and os.path.exists(self.current_video):
-                saves_dir = os.path.abspath("./saves")
-                os.makedirs(saves_dir, exist_ok=True)
-                
-                video_filename = f"video_state_{int(time.time())}.mp4"
-                video_save_path = os.path.join(saves_dir, video_filename)
-                
-                # Copy video to saves directory
-                shutil.copy2(self.current_video, video_save_path)
-                state['video_path'] = video_save_path
-                print(f"Saved video state to: {video_save_path}")
-            
-            # Save current image
-            if self.current_image:
-                # Save as PNG file
-                image_save_path = os.path.join("./saves", f"image_state_{int(time.time())}.png")
-                self.current_image.save(image_save_path)
-                
-                # Also save as base64 in state
-                buffered = io.BytesIO()
-                self.current_image.save(buffered, format="PNG")
-                img_str = base64.b64encode(buffered.getvalue()).decode('utf-8')
-                state['current_image'] = img_str
-                print(f"Saved image state to: {image_save_path}")
-            
-            # Save state file
-            state_path = os.path.abspath("./game_state.json")
-            with open(state_path, 'w') as f:
-                json.dump(state, f)
-            print(f"Saved game state to: {state_path}")
-            
-        except Exception as e:
-            print(f"Error saving game state: {e}")
+        self.video_manager.cleanup_old_videos()
+        self.rate_limited = False
 
     def load_state(self):
-        """Load game state with improved validation."""
-        try:
-            self.world_map.load_state()
-            self.world_state.load_state()
-            
-            if not os.path.exists("game_state.json"):
-                print("No game state file found")
-                return False
-                
-            with open("game_state.json", 'r') as f:
-                state = json.load(f)
-            
+        state = self.state_manager.load_game_state(
+            self.world_map, 
+            self.world_state, 
+            self.video_manager
+        )
+        if state:
             self.chat_history = state.get('chat_history', [])
-            
-            # Load video
-            video_path = state.get('video_path')
-            if video_path and os.path.exists(video_path):
-                # Validate video file
-                try:
-                    with VideoFileClip(video_path) as clip:
-                        duration = clip.duration
-                    print(f"Loaded video: {video_path} (duration: {duration}s)")
-                    self.current_video = video_path
-                except Exception as e:
-                    print(f"Error validating video file: {e}")
-                    self.current_video = None
-            
-            # Load image
-            if state.get('current_image'):
-                try:
-                    image_data = base64.b64decode(state['current_image'])
-                    self.current_image = Image.open(io.BytesIO(image_data))
-                    self.current_image.save("./current_frame.png")  # Save for verification
-                    print("Loaded current image")
-                except Exception as e:
-                    print(f"Error loading image: {e}")
-                    self.current_image = None
-                    
-            return True
-            
-        except Exception as e:
-            print(f"Error loading game state: {e}")
-            return False
+            self.current_video = state.get('video_path')
+            self.current_image = state.get('current_image')
+
+    def save_state(self):
+        self.state_manager.save_game_state(
+            self.world_map,
+            self.world_state,
+            self.chat_history,
+            self.current_video,
+            self.current_image
+        )
+
+    def reset(self):
+        """Reset the game to initial state."""
+        self.world_map.reset()
+        self.world_state = WorldState()
+        self.chat_history = []
+        self.current_image = None
+        self.current_video = None
+        self.save_state()
+
+    def start_video_generation(self, image_path, prompt):
+        def callback(video_path, last_frame, rate_limited):
+            if rate_limited:
+                self.rate_limited = True
+                self.current_image = self.new_image
+                if self.current_image:
+                    self.image_manager.save_image(self.current_image, "./current_frame.png")
+            else:
+                self.current_video = video_path
+                if last_frame:
+                    self.current_image = last_frame
+                    self.image_manager.save_image(self.current_image, "./current_frame.png")
+                self.rate_limited = False
+            self.video_processing = False
+            self.save_state()
+
+        self.video_processing = True
+        self.video_manager.start_video_generation(
+            image_path=image_path,
+            prompt=prompt,
+            callback=callback,
+            rate_limited_flag=self.rate_limited
+        )
 
     def process_input(self, user_input):
         current_svg = self.world_map.get_current_svg()
         current_description = self.world_map.get_current_description()
 
-        context = f"Current scene SVG: {current_svg}\n"
-        context += f"Current scene description: {current_description}\n"
-        context += f"Available directions: {', '.join(self.world_map.get_available_directions())}\n"
-        context += f"Current world rules: {json.dumps(self.world_state.rules)}\n"
-        context += f"Recent events: {json.dumps(self.world_state.events[-5:])}\n"
-        context += f"Player action: {user_input}\n"
+        context = (
+            f"Current scene SVG: {current_svg}\n"
+            f"Current scene description: {current_description}\n"
+            f"Available directions: {', '.join(self.world_map.get_available_directions())}\n"
+            f"Current world rules: {json.dumps(self.world_state.rules)}\n"
+            f"Recent events: {json.dumps(self.world_state.events[-5:])}\n"
+            f"Player action: {user_input}\n"
+        )
         system_prompt = config.GAME_ENGINE_SYSTEM_PROMPT
 
         self.chat_history = update_chat_history(self.chat_history, "user", user_input)
@@ -231,7 +148,7 @@ class Game:
         )
     
     def generate_first_person_visuals(self, user_input, scene_svg, scene_description, narrative):
-        user_input = (
+        user_input_formatted = (
             f"Previous Action: {user_input}\n"
             f"Result: {narrative}\n"
             f"{config.SCENE_SVG_INPUT_NAME}: {scene_svg}\n"
@@ -239,12 +156,12 @@ class Game:
         )
         system_prompt = config.SVG_GENERATION_SYSTEM_PROMPT
 
-        print(user_input)
+        print(user_input_formatted)
 
         chat_history = [
             {
                 "role": "user",
-                "content": user_input
+                "content": user_input_formatted
             }
         ]
 
@@ -260,10 +177,12 @@ class Game:
         try:
             for chunk in visual_stream:
                 if isinstance(chunk, dict):
-                    return chunk["visuals"]
+                    return chunk.get("visuals", {})
         except Exception as e:
             print(e)
-            print(json.dumps(chunk))
+            if 'chunk' in locals():
+                print(json.dumps(chunk))
+        return {}
 
     def update_game_state(self, game_output):
         if not isinstance(game_output, dict):
@@ -287,12 +206,9 @@ class Game:
         if scene:
             new_location = self.world_map.current_position
             tile_color = scene.get('tile_color', '#FFFFFF')
-            new_svg = ""
-            new_description = description
+            new_svg = scene.get('new_svg', "")
+            new_description = description or scene.get("scene_description", "")
             self.world_map.update_location(*new_location, new_svg, new_description, tile_color)
-
-        if not description and scene:
-            description = scene.get("scene_description")
 
         print(json.dumps(game_output))
 
@@ -312,45 +228,32 @@ class Game:
 
         self.current_svg = first_person_svg  # for dev UI display
 
-        if first_person_description and not config.CONTINUOUS_VIDEO or self.current_image is None:
-            first_person_visual = config.FIRST_PERSON_MODIFIER.format(visual=first_person_description)
-            try:
-                if config.GENERATE_SVG and first_person_svg:
-                    image_bytes = generate_svg_image(
-                        positive_prompt=first_person_visual,
-                        svg=first_person_svg,
-                        negative_prompt=config.NEGATIVE_STYLE_MODIFIER,
-                        kwargs=config.SVG_IMAGE_ARGS
-                    )
-                else:
-                    image_bytes = generate_image(
-                        positive_prompt=first_person_visual,
-                        negative_prompt=config.NEGATIVE_STYLE_MODIFIER
-                    )
-
-                self.current_image = Image.open(io.BytesIO(image_bytes)) if image_bytes else None
-                self.current_image.save("./temp.png")
-
-            except Exception as e:
-                print(f"Failed to generate image: {str(e)}")
-                logging.error(f"Failed to generate image: {str(e)}")
-                self.current_image = None
+        if first_person_description:
+            new_image = self.image_manager.generate_new_image(visual_output, config)
+            if new_image:
+                self.new_image = new_image
+                self.image_manager.save_image(self.new_image, "./temp.png")
         
-        # After image generation:
-        if self.current_image and not self.video_processing:
-            # Save temp image for video generation
-            temp_img_path = "./temp.png"
-            self.current_image.save(temp_img_path)
+        # Set current_image if none exists
+        if self.current_image is None and self.new_image:
+            self.current_image = self.new_image
 
+        # Attempt video generation
+        if self.new_image and not self.video_processing and config.GENERATE_VIDEO and not self.rate_limited:
             video_prompt = config.VIDEO_FIRST_PERSON_MODIFIER.format(prompt=first_person_video)
-    
-            if first_person_video:
-                # Start async video generation using the LLM-provided video description
-                self.start_video_generation(
-                    image_path=temp_img_path,
-                    prompt=video_prompt
-                )
+            temp_img_path = "./temp.png"
+            self.video_manager.start_video_generation(
+                image_path=temp_img_path,
+                prompt=video_prompt,
+                callback=self.handle_video_callback,
+                rate_limited_flag=self.rate_limited
+            )
 
+        # Handle fallback to new_image if rate limited or video generation fails
+        if self.rate_limited or not config.GENERATE_VIDEO:
+            self.current_image = self.new_image
+
+        # Update rules and events
         if rule_updates:
             for rule in rule_updates:
                 self.world_state.add_rule(rule['rule_name'], rule['rule_description'])
@@ -363,59 +266,20 @@ class Game:
 
         self.save_state()
 
-    def compile_videos(self):
-        """Compile all videos in video_tmp into a single video."""
-        try:
-            video_files = sorted(
-                [f for f in os.listdir("./video_tmp") if f.startswith("video_")],
-                key=lambda x: int(x.split("_")[1].split(".")[0])
-            )
-            
-            if not video_files:
-                return None, "No videos found to compile"
-
-            clips = []
-            for video_file in video_files:
-                video_path = os.path.join("./video_tmp", video_file)
-                try:
-                    clip = VideoFileClip(video_path)
-                    clips.append(clip)
-                except Exception as e:
-                    print(f"Error loading video {video_file}: {e}")
-                    continue
-
-            if not clips:
-                return None, "No valid video clips found"
-
-            compilation_path = os.path.join("./video_tmp", "compilation.mp4")
-            
-            final_clip = concatenate_videoclips(clips, method="compose")
-            final_clip.write_videofile(compilation_path)
-            
-            for clip in clips:
-                clip.close()
-            final_clip.close()
-
-            return compilation_path, "Success"
-            
-        except Exception as e:
-            return None, f"Compilation failed: {str(e)}"
-
-    def cleanup_old_videos(self):
-        """Remove old video files to prevent disk space issues"""
-        saves_dir = "saves"
-        if not os.path.exists(saves_dir):
-            return
-        for file in os.listdir(saves_dir):
-            if file.startswith("save_video_"):
-                file_path = os.path.join(saves_dir, file)
-                # Keep only videos from last 24 hours
-                if time.time() - os.path.getctime(file_path) > 86400:
-                    try:
-                        os.remove(file_path)
-                        print(f"Removed old video: {file_path}")
-                    except Exception as e:
-                        print(f"Error removing old video {file_path}: {e}")
+    def handle_video_callback(self, video_path, last_frame, rate_limited):
+        if rate_limited:
+            self.rate_limited = True
+            self.current_image = self.new_image
+            if self.current_image:
+                self.image_manager.save_image(self.current_image, "./current_frame.png")
+        else:
+            self.current_video = video_path
+            if last_frame:
+                self.current_image = last_frame
+                self.image_manager.save_image(self.current_image, "./current_frame.png")
+            self.rate_limited = False
+        self.video_processing = False
+        self.save_state()
 
     def get_current_image(self):
         return self.current_image
@@ -448,3 +312,6 @@ class Game:
             'minimap': minimap_data,
             'current_position': {'x': start_x, 'y': start_y}
         }
+
+    def compile_videos(self):
+        return self.video_manager.compile_videos()
