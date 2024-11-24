@@ -24,7 +24,7 @@ https://github.com/user-attachments/assets/4b400332-cd6e-44e4-b3b7-a689401ab0ba
     - Once OpenAI releases LLM native image generation (I think the term was LLVM, I don't recall), the LLM should provide a much more coherent way of creating an end image based on the user action. Then we can just use Text2Video to fill in between.
  3) Using the last frame of a video tends toward decoherence of realistic video
     - Working on implementing an img2img refinement step on the final frame for each step. This should keep image style roughly persistent
- 5) Generation times are slow (will switch to faster services when available)
+ 5) Generation times are slow and cost is high (5 cents/second). I'll switch to faster services when available.
 
 ### LLM Anchored Image Generation
 By using LLM to output SVG, we provide a logical "grounding" to the scene. This SVG is consistent for the scene, meaning any interactions with the scene will update the SVG, guiding the image generated.
