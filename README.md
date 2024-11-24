@@ -10,7 +10,7 @@
     - ```world_state.json```
 
 ## Novel Ideas
-### Interactable LLM Driven Video Generation
+### Interactable LLM Driven Text2Video Generation
 https://github.com/user-attachments/assets/4b400332-cd6e-44e4-b3b7-a689401ab0ba
 
 ## Actions taken (turn-by-turn text-based actions)
