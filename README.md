@@ -14,9 +14,9 @@
 https://github.com/user-attachments/assets/4b400332-cd6e-44e4-b3b7-a689401ab0ba
 
 ## Actions taken (turn-by-turn text-based actions)
- 1) Walk through forest
- 2) See moss and go pick it up
- 3) Pull out my axe and try to chop a crystal tree down
+ 1) "Walk through forest"
+ 2) "See moss and go pick it up"
+ 3) "Pull out my axe and try to chop a crystal tree down"
 
 ## Current limitations
  1) Text2Video model (Runway Gen-3 Alpha Turbo) is either not coherent enough OR model needs to be prompted to more effectively use (currently working on prompt tuning the LLM to use Text2Video models better)
